@@ -4,6 +4,9 @@ echo "Select Node.js version [default: 20.16]:"
 read NODE_VERSION
 NODE_VERSION=${NODE_VERSION:-20.16}
 
+echo "Enter project name:"
+read PROJECT_NAME
+
 echo "Select your package manager:"
 echo "1. pnpm"
 echo "2. yarn"
@@ -20,10 +23,8 @@ case $PM_CHOICE in
     ;;
   3)
     PM="yarn berry"
-    echo "Choose mode for yarn berry:"
-    echo "1. pnp"
-    echo "2. zero install"
-    read YARN_BERRY_MODE
+    echo "Is this project using pnp ? (y, n)"
+    read IS_PNP
     ;;
   4)
     PM="npm"
@@ -35,98 +36,45 @@ case $PM_CHOICE in
 esac
 
 echo "Creating project directory..."
-mkdir my-express-ts-app
-cd my-express-ts-app
+mkdir $PROJECT_NAME
+cd $PROJECT_NAME
 
-echo "Initializing project..."
-if [ "$PM" = "pnpm" ]; then
-  pnpm init -y
-elif [ "$PM" = "yarn" ]; then
-  yarn init -y
-elif [ "$PM" = "yarn berry" ]; then
+PACAKGES="express"
+DEV_PACKAGES="typescript ts-node prettier eslint-plugin-prettier eslint-config-prettier @typescript-eslint/parser @typescript-eslint/eslint-plugin @types/express @types/node eslint @eslint/js typescript-eslint globals"
+
+# package.json 생성
+if [ "$PM" == "pnpm" ]; then
+  pnpm init
+  pnpm add $PACAKGES
+  pnpm add -D $DEV_PACKAGES
+elif [ "$PM" == "yarn" ]; then
+  yarn init
+  yarn add $PACAKGES
+  yarn add -D $DEV_PACKAGES
+elif [ "$PM" == "yarn berry" ]; then
   yarn set version berry
-  yarn init -y
-  if [ "$YARN_BERRY_MODE" = "1" ]; then
-    yarn config set nodeLinker pnp
-  elif [ "$YARN_BERRY_MODE" = "2" ]; then
-    yarn plugin import workspace-tools
-    touch .yarnrc.yml
-    echo "enableGlobalCache: true" >> .yarnrc.yml
-  fi
+  yarn init
+  # .yarnrc.yml 생성
+  echo "nodeLinker: pnp" > .yarnrc.yml
+  echo "enableGlobalCache: false" >> .yarnrc.yml
+  yarn add $PACAKGES
+  yarn add -D $DEV_PACKAGES
 else
-  npm init -y
+  npm init
+  npm install $PACAKGES
+  npm install -D $DEV_PACKAGES
 fi
 
-echo "Installing dependencies..."
-if [ "$PM" = "pnpm" ]; then
-  pnpm add express
-  pnpm add -D typescript @types/node @types/express ts-node-dev eslint prettier eslint-config-prettier eslint-plugin-prettier
-elif [ "$PM" = "yarn" ] || [ "$PM" = "yarn berry" ]; then
-  yarn add express
-  yarn add -D typescript @types/node @types/express ts-node-dev eslint prettier eslint-config-prettier eslint-plugin-prettier
-else
-  npm install express
-  npm install --save-dev typescript @types/node @types/express ts-node-dev eslint prettier eslint-config-prettier eslint-plugin-prettier
-fi
+# .gitignore 생성
+cp "$(dirname "$0")"/gitignore.txt .gitignore
 
-echo "Setting up TypeScript..."
-mkdir src
-touch src/index.ts
-npx tsc --init --rootDir src --outDir dist --esModuleInterop --resolveJsonModule --lib ES6 --module commonjs
+# eslintrc 생성
+cp "$(dirname "$0")"/eslint.config.mjs eslint.config.mjs
 
-cat <<EOL > src/index.ts
-import express, { Request, Response } from 'express';
+# prettierrc 생성
+cp "$(dirname "$0")"/prettierrc .prettierrc
 
-const app = express();
-const port = 3000;
-
-app.get('/', (req: Request, res: Response) => {
-  res.send('Hello, TypeScript with Express!');
-});
-
-app.listen(port, () => {
-  console.log(\`Server is running at http://localhost:\${port}\`);
-});
-EOL
-
-echo "Setting up ESLint..."
-cat <<EOL > .eslintrc.json
-{
-  "parser": "@typescript-eslint/parser",
-  "extends": [
-    "plugin:@typescript-eslint/recommended",
-    "prettier"
-  ],
-  "plugins": ["@typescript-eslint", "prettier"],
-  "rules": {
-    "prettier/prettier": "error"
-  },
-  "env": {
-    "node": true,
-    "es6": true
-  }
-}
-EOL
-
-echo "Setting up Prettier..."
-cat <<EOL > .prettierrc
-{
-  "semi": true,
-  "singleQuote": true,
-  "trailingComma": "all",
-  "printWidth": 80
-}
-EOL
-
-echo "Adding start script..."
-if [ "$PM" = "pnpm" ]; then
-  pnpm set-script start "ts-node-dev src/index.ts"
-elif [ "$PM" = "yarn" ] || [ "$PM" = "yarn berry" ]; then
-  yarn add ts-node-dev
-  yarn set-script start "ts-node-dev src/index.ts"
-else
-  npm set-script start "ts-node-dev src/index.ts"
-fi
-
-echo "Project setup complete!"
+# tsconfig 생성
+cp "$(dirname "$0")"/tsconfig.json tsconfig.json
+cp "$(dirname "$0")"/tsconfig.build.json tsconfig.build.json
 
